@@ -43,6 +43,8 @@ const cacheFolder = './cache';
 let cacheData = fs.readdirSync(cacheFolder), 
   totalSize = 0, readData = {};
 
+console.log(cacheData);
+
 cacheData.forEach((cache, idx) => {
   let file = cacheFolder + '/' + cache;
   fs.stat(file, function(err, stats) {
