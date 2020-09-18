@@ -58,19 +58,19 @@ let cacheData = fs.readdirSync(cacheFolder),
 
 const statsCacheFile = './stats-cache.json';
 
+cacheData.forEach((cache, idx) => {
+  let file = cacheFolder + '/' + cache;
+  fs.stat(file, function(err, stats) {
+    readData[cache] = {
+      size: stats.size,
+      updateTime: moment(stats.mtimeMs).format('YYYY-MM-DD HH:mm:ss')
+    }
+    totalSize += stats.size;
+  });
+});
+
 router.get('/', async (ctx, next) => {
   try {
-    totalSize = 0;
-    cacheData.forEach((cache, idx) => {
-      let file = cacheFolder + '/' + cache;
-      fs.stat(file, function(err, stats) {
-        readData[cache] = {
-          size: stats.size,
-          updateTime: moment(stats.mtimeMs).format('YYYY-MM-DD HH:mm:ss')
-        }
-        totalSize += stats.size;
-      });
-    });
 
     let statsCache = {
       addr: '', balance: 0, balanceAr: 0
@@ -163,6 +163,8 @@ function postTo(file) {
       const data = Buffer.concat(buffers);
      
       arweaveUtil.post(Uint8Array.from(data), file.type).then(txId => {
+        cacheData.push(txId);
+        totalSize += file.size;
         resolve(txId);
       }).catch(err => {
         reject(err);
