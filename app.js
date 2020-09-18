@@ -1,9 +1,14 @@
 const Koa = require('koa');
 const Router = require('koa-router');
+
 const koaBody = require('koa-body');
 const KoaLogger = require("koa-logger");
+
 const fs = require('fs');
+const path = require('path');
 const fileType = require('file-type');
+
+const render = require('koa-ejs');
 
 const moment = require('moment');
 
@@ -16,6 +21,14 @@ const router = new Router();
 const PORT = 3001;
 
 const logger = KoaLogger();
+
+render(app, {
+  root: path.join(__dirname, 'views'),
+  viewExt: 'html',
+  layout: false,
+  cache: false,
+  debug: false,
+});
 
 const VALID_MIME = [
   'image/png',
@@ -43,25 +56,24 @@ const cacheFolder = './cache';
 let cacheData = fs.readdirSync(cacheFolder), 
   totalSize = 0, readData = {};
 
-console.log(cacheData);
-
-cacheData.forEach((cache, idx) => {
-  let file = cacheFolder + '/' + cache;
-  fs.stat(file, function(err, stats) {
-    readData[cache] = {
-      size: stats.size,
-      updateTime: moment(stats.mtimeMs).format('YYYY-MM-DD HH:mm:ss')
-    }
-    totalSize += stats.size;
-  });
-});
-
 const statsCacheFile = './stats-cache.json';
 
 router.get('/', async (ctx, next) => {
   try {
+    
+    cacheData.forEach((cache, idx) => {
+      let file = cacheFolder + '/' + cache;
+      fs.stat(file, function(err, stats) {
+        readData[cache] = {
+          size: stats.size,
+          updateTime: moment(stats.mtimeMs).format('YYYY-MM-DD HH:mm:ss')
+        }
+        totalSize += stats.size;
+      });
+    });
+
     let statsCache = {
-      addr: 'LqHtqKcl4qmJWQE_ZRlbCtJiH2E46FibrS5qUlSBJl0', balance: 0
+      addr: '', balance: 0, balanceAr: 0
     };
 
     if (fs.existsSync(statsCacheFile)) {
@@ -69,90 +81,31 @@ router.get('/', async (ctx, next) => {
       statsCache = JSON.parse(statsCache);
     }
 
-    let html = `
-      <html>
-        <head>
-          <title>Arweave Endpoint</title>
-        </head>
-        <body>
-          <h3>Status:</h3>
-          <p>Address: <a target="_blank" href="https://viewblock.io/arweave/address/${statsCache.addr}">${statsCache.addr}</a></p>
-          <p>Balance: ${statsCache.balance} Wins (${arweaveUtil.instance.ar.winstonToAr(statsCache.balance)} Ar)</p>
-          <h4>Cached: ${cacheData.length} Files. Total Size: ${totalSize / (1024 * 1024)} Mb</h4>
-          <ul id="links"></ul>
-          <script>
-            var readData = '${JSON.stringify(readData)}';
-            
-            var wrapper = document.getElementById('links');
-            readData = JSON.parse(readData);
-
-            var keys = Object.keys(readData);
-
-            keys.forEach(key => {
-              var item = readData[key];
-            
-              var li = document.createElement('li');
-              li.innerHTML = '<p><a target="_blank" href="https://arweave.net/tx/' + key + '">' + key + '</a></p>' +
-              '<p><span>Size: ' + item.size / (1024 * 1024) + ' Mb, Update Time: ' + item.updateTime + '</span></p>';
-              
-              wrapper.appendChild(li);
-            });
-
-            var idx = 0;
-            const lis = document.querySelectorAll('ul li');
-            function getStatus() {
-              var tx = keys[idx];
-              var li = lis[idx];
-              
-              fetch('./status/' + tx).then(data => data.json()).then(json => {
-                var p = li.querySelector('p:first-child');
-                var span = document.createElement('span');
-                span.style = json.data.confirmed ? 'color:#87d068' : 'color:#f50';
-                span.innerHTML = json.data.confirmed ? ' ✔ ' : ' ✘ ';
-                span.innerHTML += 'status: ' + json.data.status + ', ' + 
-                  'confirmed: ' + (json.data.confirmed ? json.data.confirmed.number_of_confirmations : 'null');
-                p.appendChild(span);
-
-                if (idx < (keys.length - 1)) {
-                  idx ++;
-                  getStatus();
-                }
-              }).catch(err => {
-                if (idx < (keys.length - 1)) {
-                  idx ++;
-                  getStatus();
-                }
-              });
-            }
-            getStatus();
-          </script>
-        </body>
-      </html>
-    `;
-
-    ctx.body = html;
-
+    await ctx.render('index', {
+      statsCache,
+      cacheData,
+      totalSize,
+      readData
+    });
+    
     Promise.all([
       arweaveUtil.getWalletAddress(),
       arweaveUtil.getBalance()
     ]).then(([addr, balance]) => {
       fs.writeFile('stats-cache.json', JSON.stringify({
-        addr, balance
+        addr, balance, balanceAr: arweaveUtil.instance.ar.winstonToAr(balance)
       }), function (){});
+    });
+
+    fs.readdir(cacheFolder, function(err, data) {
+      if (!err) {
+        cacheData = data;
+      }
     });
     
   } catch(err) {
-    
-    ctx.body = `
-      <html>
-        <head>
-          <title>Arweave Endpoint</title>
-        </head>
-        <body>
-          <h3>Status: error</h3>
-        </body>
-      </html>
-    `;
+    console.log(err);
+    await ctx.render('error');
   }
 });
 

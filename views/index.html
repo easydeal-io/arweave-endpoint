@@ -1,0 +1,50 @@
+<html>
+  <head>
+    <title>Arweave Endpoint</title>
+  </head>
+  <body>
+    <h3>Status:</h3>
+    <p>Address: <a target="_blank" href="https://viewblock.io/arweave/address/<%= statsCache.addr %>"><%= statsCache.addr %></a></p>
+    <p>Balance: <%= statsCache.balance %> Wins <%= statsCache.balanceAr %> Ar </p>
+    <h4>Cached: <%= cacheData.length %> Files. Total Size: <%= totalSize / 1024 / 1024 %> Mb</h4>
+    <ul id="links">
+      <%  
+        Object.keys(readData).forEach(function (key) { 
+          item = readData[key];
+      %>
+        <li>
+          <p><a target="_blank" href="https://arweave.net/tx/<%= key %>"><%= key %></a></p>
+          <p><span>Size: <%= item.size / 1024 / 1024 %> Mb, Update Time: <%= item.updateTime %></p>
+        </li>
+      <% }) %>
+    </ul>
+    <script>
+     
+      var idx = 0;
+      var lis = document.querySelectorAll('ul li');
+      function getStatus() {
+       
+        var li = lis[idx];
+        var p = li.querySelector('p:first-child');
+        var a = p.querySelector('a');
+
+        fetch('./status/' + a.innerText).then(data => data.json()).then(json => {
+          var span = document.createElement('span');
+          span.style = json.data.confirmed ? 'color:#87d068' : 'color:#f50';
+          span.innerHTML = json.data.confirmed ? ' ✔ ' : ' ✘ ';
+          span.innerHTML += 'status: ' + json.data.status + ', ' + 
+            'confirmed: ' + (json.data.confirmed ? json.data.confirmed.number_of_confirmations : 'null');
+          p.appendChild(span);
+
+        }).finally(err => {
+          if (idx < (lis.length - 1)) {
+            idx ++;
+            getStatus();
+          }
+        });
+      }
+
+      getStatus();
+    </script>
+  </body>
+</html>
