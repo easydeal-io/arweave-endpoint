@@ -60,7 +60,7 @@ const statsCacheFile = './stats-cache.json';
 
 router.get('/', async (ctx, next) => {
   try {
-    
+    totalSize = 0;
     cacheData.forEach((cache, idx) => {
       let file = cacheFolder + '/' + cache;
       fs.stat(file, function(err, stats) {
